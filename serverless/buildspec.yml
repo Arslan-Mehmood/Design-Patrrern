@@ -3,33 +3,38 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
+      # Navigate to serverless subdirectory where the code is located
+      # Repository structure: Design-Pattren/serverless/ (where all code is)
+      - echo Changing to serverless directory...
+      - cd serverless && pwd && ls -la
+      # Free Tier Optimization: Install SAM CLI efficiently
       - echo Installing SAM CLI...
-      - pip install --upgrade pip
-      - pip install aws-sam-cli
+      - pip install --upgrade pip --quiet
+      - pip install aws-sam-cli --quiet
       - sam --version
       - echo Installing Node.js dependencies...
-      - cd src/lambda/create-product && npm install && cd ../../..
-      - cd src/lambda/add-to-sell && npm install && cd ../../..
-      - cd src/lambda/get-dashboard && npm install && cd ../../..
-      - cd src/lambda/process-inventory && npm install && cd ../../..
+      # Install dependencies (paths are relative to serverless directory - chain cd commands)
+      - cd serverless && cd src/lambda/create-product && npm install --silent
+      - cd serverless && cd src/lambda/add-to-sell && npm install --silent
+      - cd serverless && cd src/lambda/get-dashboard && npm install --silent
+      - cd serverless && cd src/lambda/process-inventory && npm install --silent
       - echo Build started on `date`
       - echo Validating SAM template...
-      - sam validate --template template.yaml
+      - cd serverless && sam validate --template template.yaml
   build:
     commands:
+      # Free Tier Optimization: Standard build (faster, uses less resources)
       - echo Building SAM application...
-      - sam build
+      - cd serverless && sam build
       - echo Build completed on `date`
   post_build:
     commands:
       - echo Packaging SAM application...
-      - sam package --template-file .aws-sam/build/template.yaml --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
+      - cd serverless && sam package --template-file .aws-sam/build/template.yaml --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
       - echo Package completed on `date`
 artifacts:
   files:
-    - packaged-template.yaml
-    - template.yaml
-    - buildspec.yml
+    - serverless/packaged-template.yaml
+    - serverless/template.yaml
+    - serverless/buildspec.yml
     - '**/*'
-
