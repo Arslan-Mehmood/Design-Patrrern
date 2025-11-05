@@ -1,0 +1,35 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - echo Installing SAM CLI...
+      - pip install --upgrade pip
+      - pip install aws-sam-cli
+      - sam --version
+      - echo Installing Node.js dependencies...
+      - cd src/lambda/create-product && npm install && cd ../../..
+      - cd src/lambda/add-to-sell && npm install && cd ../../..
+      - cd src/lambda/get-dashboard && npm install && cd ../../..
+      - cd src/lambda/process-inventory && npm install && cd ../../..
+      - echo Build started on `date`
+      - echo Validating SAM template...
+      - sam validate --template template.yaml
+  build:
+    commands:
+      - echo Building SAM application...
+      - sam build
+      - echo Build completed on `date`
+  post_build:
+    commands:
+      - echo Packaging SAM application...
+      - sam package --template-file .aws-sam/build/template.yaml --s3-bucket $S3_BUCKET --output-template-file packaged-template.yaml
+      - echo Package completed on `date`
+artifacts:
+  files:
+    - packaged-template.yaml
+    - template.yaml
+    - buildspec.yml
+    - '**/*'
+

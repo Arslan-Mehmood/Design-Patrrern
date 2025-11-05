@@ -1,0 +1,11 @@
+{
+  "name": "get-dashboard",
+  "version": "1.0.0",
+  "description": "Lambda function to get dashboard data",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "^3.490.0"
+  }
+}
+

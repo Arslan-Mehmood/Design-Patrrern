@@ -1,0 +1,45 @@
+# AWS SAM
+.aws-sam/
+samconfig.toml.bak
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# CodeBuild/CodePipeline
+packaged-template.yaml
+buildspec.yml.bak
+*.zip
+codepipeline-artifacts/
+build-artifacts/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/

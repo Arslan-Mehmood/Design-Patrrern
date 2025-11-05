@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Inventory Management System with Lambda, Step Functions, DynamoDB (Free Tier Optimized)
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Environment:
+      Variables:
+        PRODUCTS_TABLE: !Ref ProductsTable
+        INVENTORY_TABLE: !Ref InventoryTable
+        CACHE_TABLE: !Ref CacheTable
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+      AllowOrigin: "'*'"
+
+Resources:
+  # DynamoDB Tables (Free Tier: 25 GB storage, 25 RCU, 25 WCU)
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ProductsTable
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: productId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: productId
+          KeyType: HASH
+
+  InventoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: InventoryTable
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: productId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: productId
+          KeyType: HASH
+
+  # Cache Table (using DynamoDB instead of Redis for free tier)
+  CacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CacheTable
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: cacheKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cacheKey
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Lambda Functions
+  CreateProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: CreateProductFunction
+      CodeUri: src/lambda/create-product/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CacheTable
+      Events:
+        CreateProductApi:
+          Type: Api
+          Properties:
+            Path: /products
+            Method: POST
+
+  AddToSellFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AddToSellFunction
+      CodeUri: src/lambda/add-to-sell/
+      Handler: index.handler
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref ProcessInventoryStateMachine
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InventoryTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CacheTable
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !Ref ProcessInventoryStateMachine
+      Events:
+        AddToSellApi:
+          Type: Api
+          Properties:
+            Path: /inventory/add
+            Method: POST
+
+  GetDashboardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GetDashboardFunction
+      CodeUri: src/lambda/get-dashboard/
+      Handler: index.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref InventoryTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CacheTable
+      Events:
+        GetDashboardApi:
+          Type: Api
+          Properties:
+            Path: /dashboard
+            Method: GET
+
+  ProcessInventoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ProcessInventoryFunction
+      CodeUri: src/lambda/process-inventory/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InventoryTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CacheTable
+
+  # Step Functions State Machine (Free Tier: 4,000 state transitions/month)
+  ProcessInventoryStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: ProcessInventoryStateMachine
+      RoleArn: !GetAtt StepFunctionsRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Process inventory addition workflow",
+          "StartAt": "ValidateProduct",
+          "States": {
+            "ValidateProduct": {
+              "Type": "Task",
+              "Resource": "${ProcessInventoryFunction.Arn}",
+              "Parameters": {
+                "action": "validate",
+                "productId.$": "$.productId",
+                "quantity.$": "$.quantity"
+              },
+              "Next": "UpdateInventory"
+            },
+            "UpdateInventory": {
+              "Type": "Task",
+              "Resource": "${ProcessInventoryFunction.Arn}",
+              "Parameters": {
+                "action": "update",
+                "productId.$": "$.productId",
+                "quantity.$": "$.quantity"
+              },
+              "End": true
+            }
+          }
+        }
+
+  # IAM Role for Step Functions
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StepFunctionsExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt ProcessInventoryFunction.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt InventoryTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt ProductsTable.Arn
+
+Outputs:
+  ApiGatewayEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
+  ProductsTableName:
+    Description: Products DynamoDB Table Name
+    Value: !Ref ProductsTable
+  InventoryTableName:
+    Description: Inventory DynamoDB Table Name
+    Value: !Ref InventoryTable
+  CacheTableName:
+    Description: Cache DynamoDB Table Name
+    Value: !Ref CacheTable
