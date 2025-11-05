@@ -4,7 +4,7 @@ phases:
   pre_build:
     commands:
       # CodeBuild automatically sets working directory to serverless/ when buildspec is in serverless/buildspec.yml
-      - echo Current working directory:
+      - echo "Current working directory:"
       - pwd
       - ls -la
       # Free Tier Optimization: Install SAM CLI efficiently
