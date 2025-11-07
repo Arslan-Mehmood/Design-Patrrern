@@ -1,0 +1,28 @@
+{
+  "name": "inventory-system-microservices",
+  "version": "1.0.0",
+  "description": "Inventory System using Microservices and Service Registry Pattern",
+  "scripts": {
+    "install:all": "npm install && cd service-registry && npm install && cd ../shared && npm install && cd ../product-service && npm install && cd ../inventory-service && npm install && cd ../order-service && npm install && cd ../api-gateway && npm install",
+    "start:registry": "cd service-registry && npm start",
+    "start:product": "cd product-service && npm start",
+    "start:inventory": "cd inventory-service && npm start",
+    "start:order": "cd order-service && npm start",
+    "start:gateway": "cd api-gateway && npm start",
+    "dev:registry": "cd service-registry && npm run dev",
+    "dev:product": "cd product-service && npm run dev",
+    "dev:inventory": "cd inventory-service && npm run dev",
+    "dev:order": "cd order-service && npm run dev",
+    "dev:gateway": "cd api-gateway && npm run dev",
+    "test": "node test-system.js"
+  },
+  "keywords": [
+    "microservices",
+    "service-registry",
+    "inventory",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC"
+}
+
