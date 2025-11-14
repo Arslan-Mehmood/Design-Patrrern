@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-backend-service
+  namespace: inventory-system
+  labels:
+    app: inventory-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: inventory-backend
+
